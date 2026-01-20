@@ -1,29 +1,39 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Button from '../components/Button';
-import InputField from '../components/InputField';
-import SocialLoginButtons from '../components/SocialLoginButtons';
-import { Colors } from '../constants/Colors';
+import Button from '../../components/Button';
+import InputField from '../../components/InputField';
+import SocialLoginButtons from '../../components/SocialLoginButtons';
+import { Colors } from '../../constants/Colors';
+import { useAuth } from '../../context/AuthContext';
+
 
 export default function LoginScreen() {
-  const router = useRouter();
+  const { login } = useAuth();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+
+  const handleLogin = async () => {
+    try {
+      await login(email, password);
+    } catch (error) {
+      console.error('Login Error', error);
+      // Optional: Add basic alert for user feedback
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
         {/* Header Back Button */}
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={24} color={Colors.textPrimary} />
-        </TouchableOpacity>
-
+        {/* Removed Back Button to prevent navigation confusion during auth flow */}
+        
         {/* Title Section */}
         <View style={styles.headerContainer}>
           <Image 
-            source={require('../assets/images/Alfred.png')} 
+            source={require('../../../assets/images/Alfred.png')} 
             style={styles.logo} 
             resizeMode="contain" 
           />
@@ -39,11 +49,15 @@ export default function LoginScreen() {
             placeholder="Work-Email" 
             iconName="mail-outline" 
             keyboardType="email-address"
+            value={email}
+            onChangeText={setEmail}
           />
           <InputField 
             placeholder="Password" 
             iconName="lock-closed-outline" 
             isPassword 
+            value={password}
+            onChangeText={setPassword}
           />
 
           {/* Remember Me */}
@@ -59,13 +73,10 @@ export default function LoginScreen() {
             </TouchableOpacity>
           </View>
 
-          <Button title="Login" onPress={() => console.log('Login pressed')} />
+          <Button title="Login" onPress={handleLogin} />
         </View>
 
         <SocialLoginButtons />
-
-
-
         
       </ScrollView>
     </SafeAreaView>
