@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,6 +9,7 @@ import { BackendProject, fetchProjects } from '../../services/projects.service';
 import { Project } from '../../types/project';
 
 export default function MyProjectsScreen() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export default function MyProjectsScreen() {
 
   const handleProjectPress = (project: Project) => {
     console.log('Pressed project:', project.title);
-    // Navigate to details later
+    router.push(`/project/${project.id}`);
   };
 
   return (
