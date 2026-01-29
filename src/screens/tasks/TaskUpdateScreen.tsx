@@ -1,5 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -11,36 +12,59 @@ export default function TaskUpdateScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [image, setImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [location, setLocation] = useState<{ latitude: number, longitude: number, address?: string } | null>(null);
   const [comment, setComment] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
 
-  // 📷 Camera-first (gallery secondary)
-  const pickImage = async (useCamera: boolean) => {
+  // 📷 Camera-only + Geo-tagging
+  const pickImage = async () => {
     try {
-      let result;
-      if (useCamera) {
-        const permission = await ImagePicker.requestCameraPermissionsAsync();
-        if (!permission.granted) {
-          Alert.alert('Permission needed', 'Camera access is required to take photos.');
-          return;
-        }
-        result = await ImagePicker.launchCameraAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.7, // Optimize upload
-        });
-      } else {
-        result = await ImagePicker.launchImageLibraryAsync({
-          mediaTypes: ImagePicker.MediaTypeOptions.Images,
-          quality: 0.7,
-        });
+      const cameraPermission = await ImagePicker.requestCameraPermissionsAsync();
+      const locationPermission = await Location.requestForegroundPermissionsAsync();
+
+      if (!cameraPermission.granted) {
+        Alert.alert('Permission needed', 'Camera access is required to take photos.');
+        return;
       }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        quality: 0.7,
+      });
 
       if (!result.canceled) {
         setImage(result.assets[0]);
+        
+        // Start fetching location immediately after photo
+        if (locationPermission.granted) {
+          setIsLocating(true);
+          try {
+            const loc = await Location.getCurrentPositionAsync({
+              accuracy: Location.Accuracy.Balanced,
+            });
+            
+            // Optional: Get formatted address
+            const [address] = await Location.reverseGeocodeAsync({
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+            });
+
+            setLocation({
+              latitude: loc.coords.latitude,
+              longitude: loc.coords.longitude,
+              address: address ? `${address.name || address.street}, ${address.city}` : undefined
+            });
+          } catch (locError) {
+            console.warn('Failed to get location:', locError);
+          } finally {
+            setIsLocating(false);
+          }
+        }
       }
     } catch (e) {
-      console.error('Image picker error:', e);
-      Alert.alert('Error', 'Failed to pick image');
+      console.error('Task update error:', e);
+      Alert.alert('Error', 'Failed to capture update');
     }
   };
 
@@ -56,6 +80,7 @@ export default function TaskUpdateScreen() {
         taskId: id as string,
         image: image,
         comment: comment,
+        location: location || undefined
       });
 
       if (success) {
@@ -98,29 +123,47 @@ export default function TaskUpdateScreen() {
           {/* Image Section */}
           <View style={styles.imageSection}>
             {image ? (
-              <View>
+              <View style={{ width: '100%' }}>
                 <Image source={{ uri: image.uri }} style={styles.previewImage} />
                 <TouchableOpacity 
                   style={styles.removeImageButton} 
-                  onPress={() => setImage(null)}
+                  onPress={() => {
+                    setImage(null);
+                    setLocation(null);
+                  }}
                 >
                   <Ionicons name="close-circle" size={24} color="white" />
                 </TouchableOpacity>
+
+                {/* Location Badge */}
+                <View style={styles.locationBadge}>
+                  {isLocating ? (
+                    <>
+                      <ActivityIndicator size="small" color={Colors.primary} style={{ marginRight: 6 }} />
+                      <Text style={styles.locationText}>Capturing location...</Text>
+                    </>
+                  ) : location ? (
+                    <>
+                      <Ionicons name="location" size={16} color={Colors.primary} style={{ marginRight: 4 }} />
+                      <Text style={styles.locationText} numberOfLines={1}>
+                        {location.address || `${location.latitude.toFixed(4)}, ${location.longitude.toFixed(4)}`}
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={[styles.locationText, { color: '#ffcc00' }]}>
+                      Location not available
+                    </Text>
+                  )}
+                </View>
               </View>
             ) : (
               <View style={styles.placeholderContainer}>
                 <TouchableOpacity 
                   style={styles.cameraButton} 
-                  onPress={() => pickImage(true)}
+                  onPress={pickImage}
                 >
                   <Ionicons name="camera" size={32} color="white" />
                   <Text style={styles.cameraText}>Take Photo</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  onPress={() => pickImage(false)}
-                  style={styles.galleryLink}
-                >
-                  <Text style={styles.galleryText}>or choose from gallery</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -194,6 +237,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
     borderRadius: 12,
   },
+  locationBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F0F7FF',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  locationText: {
+    fontSize: 12,
+    color: '#0056b3',
+    fontWeight: '500',
+  },
   placeholderContainer: {
     width: '100%',
     aspectRatio: 16 / 9,
@@ -219,13 +277,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  galleryLink: {
-    padding: 8,
-  },
-  galleryText: {
-    color: Colors.primary,
-    fontSize: 14,
   },
   inputSection: {
     marginBottom: 24,

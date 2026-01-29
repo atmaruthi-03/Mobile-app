@@ -1,1 +1,1 @@
-export { default } from '../../../src/screens/tasks/TaskListScreen';
+export { default } from '../../../src/screens/projects/ProjectWorkspaceScreen';

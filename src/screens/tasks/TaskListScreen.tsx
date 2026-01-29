@@ -86,7 +86,7 @@ export default function TaskListScreen() {
       ) : (
         <FlatList
           data={tasks}
-          keyExtractor={(item) => item.id}
+          keyExtractor={(item, index) => `${item.id}-${index}`}
           renderItem={renderTaskItem}
           contentContainerStyle={styles.listContent}
           ListEmptyComponent={

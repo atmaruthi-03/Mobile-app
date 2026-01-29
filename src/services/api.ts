@@ -5,7 +5,7 @@ import { refreshAccessToken } from './refresh.service';
 
 const api = axios.create({
   baseURL: ENV.API_URL,
-  timeout: 15000,
+  timeout: 60000, // Increased timeout for heavy WBS payload
 });
 
 api.interceptors.request.use(
@@ -14,6 +14,7 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log(`[API Request] ${config.method?.toUpperCase()} ${config.baseURL}${config.url}`);
     return config;
   },
   (error) => {

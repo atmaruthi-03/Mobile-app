@@ -1,48 +1,34 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '../../constants/Colors';
-import { fetchTaskDetails } from '../../services/tasks.service';
-import { Task } from '../../types/task';
+import { WBSTask } from '../../types/wbs';
 
 export default function TaskDetailScreen() {
-  const { id } = useLocalSearchParams();
+  const { id, taskData } = useLocalSearchParams();
   const router = useRouter();
-  const [task, setTask] = useState<Task | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadDetails();
-  }, [id]);
-
-  const loadDetails = async () => {
-    try {
-      setLoading(true);
-      if (typeof id === 'string') {
-        const data = await fetchTaskDetails(id);
-        setTask(data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  
+  const task: WBSTask | null = useMemo(() => {
+    if (typeof taskData === 'string') {
+        try {
+            return JSON.parse(taskData);
+        } catch (e) {
+            console.error("Failed to parse Task data", e);
+            return null;
+        }
     }
-  };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-      </View>
-    );
-  }
+    return null;
+  }, [taskData]);
 
   if (!task) {
     return (
       <View style={styles.center}>
-        <Text>Task not found</Text>
+        <Text>Task data not available. Please navigate from the project list.</Text>
+        <TouchableOpacity style={styles.backButtonCenter} onPress={() => router.back()}>
+            <Text style={{color: Colors.primary}}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -53,14 +39,13 @@ export default function TaskDetailScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>Task Detail</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>Task {task.id}</Text>
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.section}>
           <Text style={styles.title}>{task.title}</Text>
-          <View style={styles.statusRow}>
-            <Text style={styles.statusLabel}>Status: </Text>
+          <View style={[styles.statusBadge, { alignSelf: 'flex-start', backgroundColor: '#F3F4F6' }]}>
             <Text style={styles.statusValue}>{task.status}</Text>
           </View>
         </View>
@@ -72,186 +57,180 @@ export default function TaskDetailScreen() {
 
         <View style={styles.section}>
           <Text style={styles.sectionHeader}>Details</Text>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Assigned To:</Text>
-            <Text style={styles.detailValue}>{task.assignedTo?.name || 'Unassigned'}</Text>
-          </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Planned Date:</Text>
-            <Text style={styles.detailValue}>{task.plannedDate}</Text>
-          </View>
-          {task.actualDate && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Actual Date:</Text>
-              <Text style={styles.detailValue}>{task.actualDate}</Text>
-            </View>
+          
+          <DetailRow label="Responsible Party" value={task.responsible_party} />
+          <DetailRow label="Planned Start" value={new Date(task.start_date).toLocaleDateString()} />
+          <DetailRow label="Due Date" value={new Date(task.due_date).toLocaleDateString()} />
+          <DetailRow label="Duration" value={`${task.duration_days} days`} />
+          <DetailRow label="Progress" value={`${task.progress}%`} />
+          
+          {task.is_critical && (
+             <View style={styles.tagRow}>
+                <Ionicons name="flame" size={16} color="#EF4444" />
+                <Text style={[styles.tagText, { color: '#EF4444' }]}>Critical Path</Text>
+             </View>
+          )}
+          {task.is_milestone && (
+             <View style={styles.tagRow}>
+                <Ionicons name="flag" size={16} color="#F59E0B" />
+                <Text style={[styles.tagText, { color: '#F59E0B' }]}>Milestone</Text>
+             </View>
           )}
         </View>
 
-        {task.timeline && task.timeline.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionHeader}>Timeline</Text>
-            {task.timeline.map((item) => (
-              <View key={item.id} style={styles.timelineItem}>
-                <View style={styles.timelineDot} />
-                <View style={styles.timelineContent}>
-                  <Text style={styles.timelineUser}>{item.user.name}</Text>
-                  <Text style={styles.timelineText}>{item.content}</Text>
-                  <Text style={styles.timelineTime}>{new Date(item.timestamp).toLocaleString()}</Text>
-                </View>
-              </View>
-            ))}
+        {task.is_external_dependency && (
+          <View style={styles.warningBox}>
+            <Ionicons name="alert-circle" size={20} color="#B45309" />
+            <Text style={styles.warningText}>
+                Requires approval from: {task.requires_approval_from}
+            </Text>
           </View>
         )}
-      </ScrollView>
 
-      <View style={styles.footer}>
         <TouchableOpacity 
-          style={styles.fab}
-          onPress={() => router.push(`/task/${task.id}/update`)}
+          style={styles.updateButton}
+          onPress={() => router.push(`/task/${task.task_id}/update`)}
         >
-          <Ionicons name="camera" size={24} color="white" />
-          <Text style={styles.fabText}>Update Progress</Text>
+          <Ionicons name="camera" size={20} color="white" style={{ marginRight: 8 }} />
+          <Text style={styles.updateButtonText}>Update Progress</Text>
         </TouchableOpacity>
-      </View>
+
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
+const DetailRow = ({ label, value }: { label: string, value: string }) => (
+  <View style={styles.detailRow}>
+    <Text style={styles.detailLabel}>{label}:</Text>
+    <Text style={styles.detailValue}>{value}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
     backgroundColor: 'white',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: Colors.textPrimary,
-    flex: 1,
   },
   center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backButton: {
+    marginRight: 16,
+  },
+  backButtonCenter: {
+    marginTop: 16,
+    padding: 10,
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    flex: 1,
   },
   content: {
-    padding: 16,
-    paddingBottom: 100,
+    padding: 20,
+    paddingBottom: 40,
   },
   section: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
+    marginBottom: 24,
   },
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#333',
+    color: '#111827',
     marginBottom: 8,
   },
-  statusRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusLabel: {
-    fontSize: 16,
-    color: '#666',
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
   },
   statusValue: {
-    fontSize: 16,
     fontWeight: '600',
-    color: Colors.primary,
+    color: '#374151',
+    textTransform: 'capitalize',
+  },
+  statusLabel: {
+    color: '#6B7280',
+    fontSize: 16,
   },
   sectionHeader: {
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
     marginBottom: 12,
-    color: '#333',
+    marginTop: 4,
   },
   bodyText: {
-    fontSize: 16,
+    fontSize: 15,
+    color: '#4B5563',
     lineHeight: 24,
-    color: '#444',
   },
   detailRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    marginBottom: 12,
+    alignItems: 'flex-start',
   },
   detailLabel: {
-    fontSize: 16,
-    color: '#666',
-  },
-  detailValue: {
-    fontSize: 16,
-    color: '#333',
+    width: 120,
+    fontSize: 14,
+    color: '#6B7280',
     fontWeight: '500',
   },
-  timelineItem: {
-    flexDirection: 'row',
-    marginBottom: 16,
-  },
-  timelineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.primary,
-    marginTop: 6,
-    marginRight: 12,
-  },
-  timelineContent: {
+  detailValue: {
     flex: 1,
+    fontSize: 14,
+    color: '#111827',
+    fontWeight: '500',
   },
-  timelineUser: {
+  tagRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  tagText: {
+    marginLeft: 6,
     fontWeight: '600',
     fontSize: 14,
-    color: '#333',
   },
-  timelineText: {
+  warningBox: {
+    backgroundColor: '#FFFBEB',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 8,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  warningText: {
+    color: '#92400E',
+    marginLeft: 8,
+    flex: 1,
     fontSize: 14,
-    color: '#444',
-    marginVertical: 4,
   },
-  timelineTime: {
-    fontSize: 12,
-    color: '#888',
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-    backgroundColor: 'white',
-    borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-  },
-  fab: {
+  updateButton: {
     backgroundColor: Colors.primary,
     flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 14,
-    borderRadius: 8,
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 8,
   },
-  fabText: {
+  updateButtonText: {
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
-    marginLeft: 8,
-  }
+  },
 });

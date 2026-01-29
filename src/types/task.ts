@@ -11,6 +11,11 @@ export interface Interaction {
   };
   content: string;
   attachments?: string[];
+  location?: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
 }
 
 export interface Task {
@@ -35,4 +40,9 @@ export interface TaskUpdatePayload {
   image: any; // We'll refine this type for multipart upload
   comment?: string;
   status?: TaskStatus;
+  location?: {
+    latitude: number;
+    longitude: number;
+    address?: string;
+  };
 }

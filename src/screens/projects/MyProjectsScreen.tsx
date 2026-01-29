@@ -1,15 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ProjectCard from '../../components/ProjectCard';
 import { Colors } from '../../constants/Colors';
+import { useAuth } from '../../context/AuthContext';
 import { BackendProject, fetchProjects } from '../../services/projects.service';
 import { Project } from '../../types/project';
 
 export default function MyProjectsScreen() {
   const router = useRouter();
+  const { logout } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +56,31 @@ export default function MyProjectsScreen() {
     router.push(`/project/${project.id}`);
   };
 
+  const handleProfilePress = () => {
+    Alert.alert(
+      'Profile',
+      'What would you like to do?',
+      [
+        {
+          text: 'Logout',
+          onPress: async () => {
+            try {
+              await logout();
+              router.replace('/(auth)/login');
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          },
+          style: 'destructive',
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       {/* Header */}
@@ -62,7 +89,7 @@ export default function MyProjectsScreen() {
           <Text style={styles.welcomeText}>Welcome back,</Text>
           <Text style={styles.headerTitle}>My Projects</Text>
         </View>
-        <TouchableOpacity style={styles.profileButton}>
+        <TouchableOpacity style={styles.profileButton} onPress={handleProfilePress}>
             {/* Placeholder for Profile Image */}
              <Ionicons name="person" size={20} color={Colors.white} />
         </TouchableOpacity>
@@ -92,7 +119,7 @@ export default function MyProjectsScreen() {
         ) : (
           <FlatList
             data={projects}
-            keyExtractor={(item) => item.id}
+            keyExtractor={(item, index) => `${item.id}-${index}`}
             renderItem={({ item }) => (
               <ProjectCard project={item} onPress={() => handleProjectPress(item)} />
             )}
